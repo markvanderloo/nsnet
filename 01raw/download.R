@@ -29,6 +29,7 @@ write.csv(series, file.path("01raw",paste0(file_prefix,"treinseries-overview.csv
 urls <- sprintf("http://wiki.ovinnederland.nl/wiki/Treinserie_%d_(2018)",series$Serie)
 
 # Each element is a sequence of stations. Each station is connected to the next.
+# some urls are invalid. These all have 'Belgie' in the actual url and are unimportant for our purpose.
 station_sequences <- lapply(urls, function(url){
   html <- tryCatch({
     html <- read_html(url)
@@ -37,7 +38,7 @@ station_sequences <- lapply(urls, function(url){
       cat(sprintf("Could not download %s:\n  %s",url,e$message))
       NULL
   })
-  if (is.null(html)) NA
+  if (is.null(html)) return(NA)
   node <- html_node(html, xpath='//*[@id="mw-content-text"]/table[2]')
   dat <- html_table(node,fill=TRUE)
   dat[-1,2]
@@ -50,6 +51,6 @@ seq_dfs <- lapply(seq_along(station_sequences), function(i){
 
 out <- do.call("rbind",seq_dfs)
 
-write.csv(out,file.path("01raw",paste0(file_prefix,"treinseries.csv")))
+write.csv(out,file.path("01raw",paste0(file_prefix,"treinseries.csv")),row.names=FALSE)
 
 
