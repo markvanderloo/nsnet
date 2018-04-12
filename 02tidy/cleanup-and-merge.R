@@ -5,6 +5,7 @@
 suppressPackageStartupMessages({
   library(tidyverse)
   library(magrittr)
+  library(stringdist)
 })
 
 ## Read raw data ----
@@ -14,10 +15,37 @@ stations <- read.csv("01raw/20180412_stations.csv", stringsAsFactors = FALSE)
 series <- read.csv("01raw/20180412_treinseries.csv", stringsAsFactors = FALSE)
 series_meta <- read.csv("01raw/20180412_treinseries-overview.csv", stringsAsFactors = FALSE)
 
-## Create pairs of stations ----
-series %<>% 
-  filter(complete.cases(series))
+## some station name cleanup -> station_names, series ----
+# remove bracketed remarks like '(sluit aan op...)'
+series$station <- str_trim(str_replace(series$station," +\\(.*",""))
 
+stations$naam <- str_replace(stations$naam,"a/d","aan den")
+stations$naam <- str_replace(stations$naam," v "," van ")
+stations$naam <- str_trim(stations$naam)
+
+
+unique(series$station)
+# Some stations in the 2018 train series are not in the 2017 station table.
+# We remove those (new, sometimes foreign) stations from the series. This
+# means these nodes are 'skipped' in the final graph, reflecting the 2017 
+# situation.
+j <- ain(series$station, stations$naam,method='osa',maxDist=2)
+series <- series[j,]
+
+station_names <- stations %>% select(code, naam)
+# remove suffix '(NS-bus)'
+station_names$naam <- str_replace(station_names$naam," +\\(.*","")
+## we create our own unique code for these unlisted stations
+# newst <- unique(series$station[j])
+# new_stations <- data.frame(
+#   code = str_to_lower(abbreviate(newst))
+#   , naam=newst
+#   , stringsAsFactors = FALSE)
+# 
+# station_names <- bind_rows(station_names, new_stations) %>%
+#   arrange(naam)
+
+## Create connection table ----
 connections <- series %>% 
   group_by(Serie) %>% 
   transmute(
@@ -26,10 +54,19 @@ connections <- series %>%
     ) %>% ungroup() %>%
   filter(complete.cases(.))
 
-# we only need sprinters and stoptrains so we get individual connections and not connections that skip
-# stoptrain stations.
 edges <- connections %>% left_join(series_meta,by="Serie")
-edges %<>%  filter(str_trim(str_to_lower(Treinsoort)) %in% c("sprinter","stoptrein"))
+edges %<>% select(Start, End, Treinsoort)
+
+edges$StartMatch <- station_names[amatch(edges$Start, station_names$naam,maxDist = 2),"naam"]
+edges$EndMatch <- station_names[amatch(edges$End, station_names$naam,maxDist = 2),"naam"]
+edges$stringdist <- stringdist(edges$Start,edges$StartMatch)
+
+# inspection : maxDist equals 1 for actual matches.
+# View(edges)
+edges %<>% select(Start=StartMatch, End=EndMatch,Treinsoort) %>%
+  filter(complete.cases(.))
+
+
 
 # Merge the tarif distances ----
 # distance to long form, conversion of type
@@ -40,58 +77,40 @@ distance <-  distmat %>%
   filter(complete.cases(.))
 
 # merge full station names
-stationsnamen <- stations %>% select(code, naam)
-stationsnamen %<>% mutate(
-  naam=str_replace(naam,"a/d","aan den")
-  ,naam=str_replace(naam," v "," van ")) 
-# we add 'Zwolle Stadshage by hand'
-stationsnamen <- rbind(stationsnamen
-  , data.frame(
-      code=c("zls","bsks")
-    , naam=c("Zwolle Stadshagen","Boskoop Snijdelwijk")))
-
-
-dd <- left_join(distance, stationsnamen, by=c("StartCode"="code")) %>%
+dd <- left_join(distance, station_names, by=c("StartCode"="code")) %>%
   rename(Start=naam)
 
-dd <- left_join(dd, stationsnamen,by=c("EndCode"="code")) %>%
+dd <- left_join(dd, station_names,by=c("EndCode"="code")) %>%
   rename(End=naam)
 
-# merge edges with distances
+dd <- dd[complete.cases(dd),]
 
-pattren <- c(" +\\(.*\\)", "-", "St\\.")
-replace <- c(""          , " ", "St")
+out <- left_join(edges,dd)
 
-tm <- edges %>%
-  mutate(Start = str_trim(str_replace(Start, pattern, replace))
-         ,End  = str_trim(str_replace(End, pattern, replace))) %>%
-  filter(!Start %in% c("Onbekend","2018"))
+# deduplicate, both A->B and A->B vs B->A
+m <- as.matrix(out[1:2])
+n <- as.data.frame(t(apply(m,1,sort)))
+out[1:2] <- n
+out <- out[!duplicated(out[1:2]),]
 
-
-
-library(stringdist)
-
-j_start <- amatch(str_trim(tm$Start), str_trim(stations$naam), method='osa',maxDist = 2)
-View(tm[which(is.na(j_start)),])
-
-
-out <- left_join(tm,dd)
-head(out)
-i <- which(is.na(out$StartCode))
-View(out[i,])
 
 ## prepare output and write ----
-# We still have double entries becuse multiple train series can pass through the same stations.
 out %<>% 
-  select(Start, End, StartCode, EndCode, Distance) %>%
+  select(start = StartCode, end = EndCode, distance = Distance, type=Treinsoort) %>%
   distinct(Start, End, .keep_all = TRUE)
+
 
 # gotta know when we ran it..
 file_prefix <- format(Sys.time(),format="%Y%m%d_")
 write.csv(out, file.path("02tidy",paste0(file_prefix,"railway-edges.csv")),row.names = FALSE)
 
+# 
+nodes <- station_names %>%
+  rename(name=naam)
+node_data <- stations %>% select(code, type,geo_lat, geo_lng)
+nodes %<>% left_join(node_data)
+# we just throw out what didn't match (mostly 'facultatiefstation')
+j <- nodes$code %in% c(out$start,out$end) 
+nodes <- nodes[j,]
 
-
-
-
-
+write.csv(nodes, file.path("02tidy",paste0(file_prefix,"railway_nodes.csv")),row.names=FALSE)

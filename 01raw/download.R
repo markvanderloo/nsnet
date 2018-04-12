@@ -25,21 +25,31 @@ node <- html_node(html, xpath='//*[@id="mw-content-text"]/table[2]')
 series <- html_table(node)
 write.csv(series, file.path("01raw",paste0(file_prefix,"treinseries-overview.csv")),row.names=FALSE)
 
+# Only series operated within NL 
+series <- subset(series, Vervoerder %in% c("NS Internationaal","NS","Arriva","Keolis Nederland","Hermes","Syntus","Connexxion"))
 # Get the train series
 urls <- sprintf("http://wiki.ovinnederland.nl/wiki/Treinserie_%d_(2018)",series$Serie)
 
 # Each element is a sequence of stations. Each station is connected to the next.
 # some urls are invalid. These all have 'Belgie' in the actual url and are unimportant for our purpose.
 station_sequences <- lapply(urls, function(url){
+  cat(sprintf("downloading %s ...\n",url))
   html <- tryCatch({
     html <- read_html(url)
   }
     , error=function(e){
-      cat(sprintf("Could not download %s:\n  %s",url,e$message))
+      cat(sprintf("Could not download %s:  %s\n",url,e$message))
       NULL
   })
   if (is.null(html)) return(NA)
-  node <- html_node(html, xpath='//*[@id="mw-content-text"]/table[2]')
+  xpth = if (grepl("_20100_",url) ){
+    # one of the subsites has a slightly different makeup
+    '//*[@id="mw-content-text"]/table[3]'
+  } else {
+    '//*[@id="mw-content-text"]/table[2]'
+  }
+  
+  node <- html_node(html, xpath=xpth)
   dat <- html_table(node,fill=TRUE)
   dat[-1,2]
 })
