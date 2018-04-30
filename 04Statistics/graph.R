@@ -3,15 +3,12 @@ suppressPackageStartupMessages({
   library(igraph)
 })
 
-edges <- read.csv("02tidy/20180412_railway-edges.csv",stringsAsFactors = FALSE)
-nodes <- read.csv("02tidy/20180412_railway_nodes.csv",stringsAsFactors = FALSE)
+edges <- read.csv("02tidy/20180419_railway-edges.csv",stringsAsFactors = FALSE)
+nodes <- read.csv("02tidy/20180419_railway_nodes.csv",stringsAsFactors = FALSE)
 
-nodes[which(!nodes$code %in% c(edges$end,edges$start)),]
-
-dim(edges)
-dim(edges)
 
 g <- graph_from_data_frame(edges, directed=FALSE, vertices=nodes)
+par(mar=c(0,0,0,0),oma=c(0,0,0,0))
 plot(g, vertex.label=NA,vertex.size=1)
 
 
