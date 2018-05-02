@@ -2,7 +2,7 @@
 # gotta know when we ran it..
 file_prefix <- format(Sys.time(),format="%Y%m%d_")
 
-## Distance matrix and Station info (reidendetreinen.nl) ----
+## Distance matrix and Station info (rijdendetreinen.nl) ----
 # Distance matrix (based on tarif)
 distmat <- read.csv("https://blog.rijdendetreinen.nl/wp-content/uploads/2017/01/afstandenmatrix-2017-01.csv")
 write.csv(distmat, file.path("01raw",paste0(file_prefix,"distance-matrix.csv")), row.names=FALSE)

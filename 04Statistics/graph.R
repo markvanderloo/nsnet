@@ -12,6 +12,11 @@ dim(edges)
 dim(edges)
 
 g <- graph_from_data_frame(edges, directed=FALSE, vertices=nodes)
+par(mar=c(0,0,0,0),oma=c(0,0,0,0))
+#png("ns.png")
 plot(g, vertex.label=NA,vertex.size=1)
+#dev.off()
+
+
 
 
