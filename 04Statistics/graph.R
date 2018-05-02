@@ -17,5 +17,9 @@ plot(g, vertex.label=NA,vertex.size=1)
 #dev.off()
 
 
+trajecten <- read.csv("02tidy/trajecten.csv",stringsAsFactors = FALSE)
+head(trajecten)
 
-
+h <- graph_from_data_frame(trajecten,directed=FALSE)
+par(mar=rep(0,4),oma=rep(0,4))
+plot(h,vertex.label=NA,vertex.size=1)
