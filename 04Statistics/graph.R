@@ -1,25 +1,49 @@
 
 suppressPackageStartupMessages({
   library(igraph)
+  library(tidyr)
+  library(dplyr)
 })
 
-edges <- read.csv("02tidy/20180419_railway-edges.csv",stringsAsFactors = FALSE)
-nodes <- read.csv("02tidy/20180419_railway_nodes.csv",stringsAsFactors = FALSE)
+source("00functions/measures.R")
 
-
-g <- graph_from_data_frame(edges, directed=FALSE, vertices=nodes)
-par(mar=c(0,0,0,0),oma=c(0,0,0,0))
-
-#png("ns.png")
-
-
-plot(g, vertex.label=NA,vertex.size=1)
-#dev.off()
-
+nsrblauw <- "#003373"
+nsgeel <- "#f7d417"
 
 trajecten <- read.csv("02tidy/trajecten.csv",stringsAsFactors = FALSE)
-head(trajecten)
+stations <-  read.csv("02tidy/trajecten_stations.csv",stringsAsFactors = FALSE)
 
-h <- graph_from_data_frame(trajecten,directed=FALSE)
+
+
+
+h <- graph_from_data_frame(trajecten,directed=FALSE,vertices=stations)
+L <- components(h)
+pdf("nsnet.pdf")
+set.seed(3)
 par(mar=rep(0,4),oma=rep(0,4))
-plot(h,vertex.label=NA,vertex.size=1)
+plot(h,vertex.label=NA
+     , vertex.size=2
+     , vertex.color=nsgeel
+     , edge.color=nsrblauw
+     , vertex.frame.color=nsrblauw)
+dev.off()
+
+
+v <- vulnerability(h)
+head(v)
+vv <- (v-min(v))/diff(range(v))
+
+pdf("nsnet.pdf")
+set.seed(3)
+par(mar=rep(0,4),oma=rep(0,4))
+plot(h,vertex.label=NA
+     , vertex.size=2 + 2*vv
+     , vertex.color=nsgeel
+     , edge.color=nsrblauw
+     , vertex.frame.color=nsrblauw)
+dev.off()
+
+
+information_content(h)
+
+       
