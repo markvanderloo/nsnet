@@ -3,9 +3,10 @@
 #' @param g a graph
 #'
 efficiency <- function(g){
+  n <- length(V(g))
+  if (n==1) return(0)
   nd <- igraph::distance_table(g)$res
   d <- seq_along(nd)
-  n <- length(V(g))
   N <- n*(n-1)
   2*sum(nd/d)/N
 }
@@ -14,7 +15,7 @@ efficiency <- function(g){
 #' @param g, a graph
 local_efficiency <- function(g){
   sapply(V(g),function(node){
-    h <- induced_subgraph(g,c(node,neighbors(g,node)))
+    h <- induced_subgraph(g,c(neighbors(g,node)))
     efficiency(h)
   })
 }
@@ -26,7 +27,7 @@ vulnerability <- function(g){
   e <- efficiency(g)
   nodes <- V(g)
   sapply(seq_along(nodes), function(i){
-    h <- induced_subgraph(g, nodes[-i])
+    h <- delete_edges(g, incident_edges(g,nodes[i])[[1]])
     1-efficiency(h)/e
   })
 }
@@ -41,6 +42,17 @@ line_efficiency <- function(n){
   sapply(n, function(ni) 2*harmonic(ni-1)/(ni-1) - 2/ni)
 }
 
+circle_efficiency <- function(n){
+  ce <- function(x){
+    h <- if (x%%2==0){
+      2*harmonic(x/2-1)/(x-1) + 2/(x*(x-1))
+    } else {
+      2*harmonic((x-1)/2)/(x-1)
+    }
+  }
+  sapply(n,ce)
+}
+  
 #' Topological information content
 #' @param g a graph
 #' 
@@ -53,51 +65,16 @@ information_content <- function(g){
 }
 
 
-#' efficacy of a graph
-#' @param a graph
-#' 
-#' @details:
-#' The efficacy of a graph is the sum over inverse shortest path lengths,
-#' multiplied with the number of shortest paths, divided by n(n-1). 
-#' (van der Loo, 2018)
-#' 
-efficacy <- function(g){
-  nodes <- seq_along(V(g))
-  n <- length(nodes)
-  out <- sapply(nodes[-1],function(i){
-    a <- sapply(seq_len(i-1), function(j){
-      L <- igraph::all_shortest_paths(g,from=i, to=j)
-      mu <- length(L$res)
-      len <- length(L$res[[1]])-1L
-      c(mu=mu,len=len)
-    })
-    sum(a[1,]/a[2,])
-  })
-  2*sum(out)/(n*(n-1))
-}
-
-
-
-local_efficacy <- function(g){
-  sapply(V(g),function(node){
-    h <- induced_subgraph(g,c(node,neighbors(g,node)))
-    efficacy(h)
-  })
-}
-
 # return a vector of graph characterizations
 measures <- function(g){
   c(
     global_efficiency = efficiency(g)
     , local_efficiency = mean(local_efficiency(g))
-    , global_efficacy = efficacy(g)
-    , local_efficacy  = mean(local_efficacy)
     , vulnerability = max(vulnerability(g))
     , topological_informatioin_content = information_content(g)
   )
 }
 
-measures(h)
 
 
 
